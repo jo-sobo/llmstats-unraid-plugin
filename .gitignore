@@ -1,0 +1,16 @@
+# Unraid specific
+*.plg.bak
+*.tmp
+
+# IDE
+.vscode/settings.json
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local planning and verification artifacts
+.local/
