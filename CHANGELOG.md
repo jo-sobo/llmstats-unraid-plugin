@@ -1,0 +1,11 @@
+### 2026.06.11
+- Initial LLMStats release.
+- Dashboard tile with one tab per configured server, online/offline status glow, and a server status card per tab.
+- Model cards with configurable fields: quantization, memory, and busy/idle state.
+- Ollama support: server status, available models, running models, metadata, memory usage, and model load/unload.
+- llama-server support: health, model listing, router mode model state, slot busy/idle activity, and router mode model load/unload.
+- Server type autodetection with manual fallback.
+- Load unloaded models where supported, unload single model, and unload all loaded models with optional confirmation.
+- Collapsed dashboard state with compact server status chips.
+- Settings page with server management (add, remove, reorder, test), per-server model display fields, and setup guidance for both server types.
+- Light and dark theme support.

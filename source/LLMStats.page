@@ -1,0 +1,1094 @@
+Menu="Dashboard:0"
+Icon="llmstats.png"
+---
+<?php
+require_once '/usr/local/emhttp/plugins/dynamix/include/Helpers.php';
+require_once '/usr/local/emhttp/plugins/llmstats/llmstats_common.php';
+
+$cfg = llmstats_read_cfg('llmstats');
+$llmstats_theme_light = llmstats_theme_is_light();
+
+$llmstats_text = [
+    'title' => llmstats_t('LLMStats'),
+    'settings' => llmstats_t('LLMStats Settings'),
+    'refresh' => llmstats_t('Refresh now'),
+    'lastUpdate' => llmstats_t('Last Update:'),
+    'noServers' => llmstats_t('No servers configured. Open the LLMStats settings to add an Ollama or llama-server endpoint.'),
+    'loadError' => llmstats_t('Error loading server states. Check browser console (F12) for details.'),
+    'offlineHint' => llmstats_t('This configured server is offline. Please check the settings or server for issues.'),
+    'noModels' => llmstats_t('No models found on this server.'),
+    'load' => llmstats_t('Load'),
+    'loadUnavailable' => llmstats_t('Loading this model is not supported by this server mode.'),
+    'unload' => llmstats_t('Unload'),
+    'unloadAll' => llmstats_t('Unload all loaded'),
+    'confirmUnload' => llmstats_t('Unload %1 from %2?'),
+    'confirmUnloadAll' => llmstats_t('Unload all loaded models on %1?'),
+    'actionFailed' => llmstats_t('Model action failed. Check the server status and try again.')
+];
+$llmstats_text_js = json_encode($llmstats_text, llmstats_json_options());
+if (!is_string($llmstats_text_js)) {
+    $llmstats_text_js = '{}';
+}
+
+$refresh_enabled = ($cfg['REFRESH_ENABLED'] ?? '1') === '1';
+$refresh_interval = llmstats_clamp_refresh_interval($cfg['REFRESH_INTERVAL'] ?? 10);
+$refresh_interval_ms = $refresh_interval * 1000;
+
+$llmstats_csrf = json_encode(llmstats_csrf_token(), llmstats_json_options());
+if (!is_string($llmstats_csrf)) {
+    $llmstats_csrf = '""';
+}
+
+$tile_title = htmlspecialchars($llmstats_text['title'], ENT_QUOTES, 'UTF-8');
+$settings_title = htmlspecialchars($llmstats_text['settings'], ENT_QUOTES, 'UTF-8');
+$refresh_title = htmlspecialchars($llmstats_text['refresh'], ENT_QUOTES, 'UTF-8');
+$last_update_text = htmlspecialchars($llmstats_text['lastUpdate'], ENT_QUOTES, 'UTF-8');
+$unload_all_text = htmlspecialchars($llmstats_text['unloadAll'], ENT_QUOTES, 'UTF-8');
+
+$pluginname = 'llmstats';
+
+$mytiles[$pluginname]['column1'] = <<<EOT
+<tbody id="db-llmstats" title="{$tile_title}">
+    <tr>
+        <td>
+            <i class="fa fa-fw fa-close control tile" onclick="dismiss($(this))" title="Close Tile"></i>
+            <span class="tile-header">
+                <span class="tile-header-left">
+                    <span class="llm-tile-icon" aria-hidden="true"><i class="icon-algorithm f32"></i></span>
+                    <div class="section">
+                        <h3 class="tile-header-main">{$tile_title}</h3>
+                    </div>
+                </span>
+                <span class="tile-header-right">
+                    <span class="tile-header-right-controls">
+                        <i id="llmstats-refresh" class="fa fa-fw fa-refresh control" title="{$refresh_title}"></i>
+                        <a href="/Settings/LLMStatsSettings" title="{$settings_title}">
+                            <i class="fa fa-fw fa-cog control"></i>
+                        </a>
+                    </span>
+                </span>
+            </span>
+        </td>
+    </tr>
+    <tr id="llmstats-collapsed-row" style="display:none;">
+        <td>
+            <div id="llmstats-chips" aria-label="Server summary"></div>
+        </td>
+    </tr>
+    <tr id="llmstats-content-row">
+        <td>
+            <div id="llmstats-content">
+                <div id="llmstats-tab-shell">
+                    <div id="llmstats-tab-bar" role="tablist" aria-label="{$tile_title}"></div>
+                </div>
+                <div id="llmstats-panels"></div>
+                <div id="llmstats-footer">
+                    <span><span class="llmstats-updated-at">{$last_update_text}</span> <span id="llmstats-timestamp"></span></span>
+                    <span><button id="llmstats-unload-all" class="llm-button danger" type="button" disabled>{$unload_all_text}</button></span>
+                </div>
+            </div>
+        </td>
+    </tr>
+</tbody>
+EOT;
+?>
+
+<style>
+#db-llmstats {
+    --llm-tab-surface: var(--table-header-background-color, <?= $llmstats_theme_light ? '#f7f7f7' : '#222' ?>);
+    --llm-panel-surface: var(--background-color, <?= $llmstats_theme_light ? '#fff' : '#1a1a1a' ?>);
+    --llm-row-surface: <?= $llmstats_theme_light ? '#fafafa' : '#202020' ?>;
+    --llm-border: var(--border-color, <?= $llmstats_theme_light ? '#bbb' : '#555' ?>);
+    --llm-border-soft: var(--border-color, <?= $llmstats_theme_light ? '#c8c8c8' : '#444' ?>);
+    --llm-text: var(--text-color, <?= $llmstats_theme_light ? '#222' : '#e0e0e0' ?>);
+    --llm-strong-text: var(--text-color, <?= $llmstats_theme_light ? '#111' : '#eee' ?>);
+    --llm-muted-text: <?= $llmstats_theme_light ? '#4b5563' : '#999' ?>;
+    --llm-footer-text: <?= $llmstats_theme_light ? '#555' : '#777' ?>;
+    --llm-footer-label: <?= $llmstats_theme_light ? '#444' : '#858585' ?>;
+    --llm-accent: #fd8830;
+    --llm-green: #4caf50;
+    --llm-red: <?= $llmstats_theme_light ? '#c94d48' : '#d9534f' ?>;
+    --llm-yellow: <?= $llmstats_theme_light ? '#b3871c' : '#d7aa45' ?>;
+    --llm-dot-idle: <?= $llmstats_theme_light ? '#888' : '#555' ?>;
+    --llm-loaded-border: <?= $llmstats_theme_light ? '#3f7f46' : '#3a6b3a' ?>;
+    --llm-busy-border: <?= $llmstats_theme_light ? '#9a7b2d' : '#75602a' ?>;
+    --llm-offline-border: <?= $llmstats_theme_light ? '#c94d48' : '#7a3b39' ?>;
+    --llm-danger-text: <?= $llmstats_theme_light ? '#8a2723' : '#e8b0ad' ?>;
+    --llm-edge-fade: <?= $llmstats_theme_light ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.88)' ?>;
+}
+#db-llmstats .llm-tile-icon {
+    width: 32px;
+    height: 32px;
+    display: inline-grid;
+    place-items: center;
+    color: var(--llm-strong-text);
+    line-height: 1;
+}
+#db-llmstats .llm-tile-icon .icon-algorithm {
+    display: block;
+}
+#llmstats-content {
+    container-type: inline-size;
+}
+#llmstats-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 7px 0;
+}
+#db-llmstats .llm-chip {
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: 6px;
+    row-gap: 1px;
+    font-size: 12px;
+    padding: 4px 9px;
+    border: 1px solid var(--llm-border-soft);
+    color: var(--llm-muted-text);
+    background: var(--llm-tab-surface);
+    min-width: 138px;
+    max-width: 190px;
+}
+#db-llmstats .llm-chip .llm-dot {
+    grid-row: 1 / 3;
+}
+#db-llmstats .llm-chip-name,
+#db-llmstats .llm-chip-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#db-llmstats .llm-chip-name {
+    color: var(--llm-text);
+    line-height: 1.2;
+}
+#db-llmstats .llm-chip-meta {
+    color: var(--llm-muted-text);
+    font-size: 10.5px;
+    line-height: 1.2;
+}
+#db-llmstats .llm-dot {
+    width: 7.2px;
+    height: 7.2px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--llm-dot-idle);
+}
+#db-llmstats .llm-dot.online {
+    background: var(--llm-green);
+    animation: llmstats-status-pulse 2.4s ease-in-out infinite;
+}
+#db-llmstats .llm-dot.offline {
+    background: var(--llm-red);
+}
+#db-llmstats .llm-dot.busy {
+    background: var(--llm-yellow);
+}
+#db-llmstats .llm-chip.is-online {
+    border-color: var(--llm-loaded-border);
+    color: var(--llm-text);
+}
+#db-llmstats .llm-chip.is-offline {
+    border-color: var(--llm-offline-border);
+    color: var(--llm-text);
+}
+#llmstats-tab-shell {
+    position: relative;
+    width: 0;
+    min-width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding-top: 10px;
+}
+#llmstats-tab-shell::before,
+#llmstats-tab-shell::after {
+    content: "";
+    position: absolute;
+    top: 10px;
+    bottom: 0;
+    width: 18px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+    z-index: 5;
+}
+#llmstats-tab-shell::before {
+    left: 0;
+    background: linear-gradient(90deg, var(--llm-edge-fade), transparent);
+}
+#llmstats-tab-shell::after {
+    right: 0;
+    background: linear-gradient(270deg, var(--llm-edge-fade), transparent);
+}
+#llmstats-tab-shell.has-left-overflow::before,
+#llmstats-tab-shell.has-right-overflow::after {
+    opacity: 1;
+}
+#llmstats-tab-bar {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--llm-border);
+}
+#llmstats-tab-bar::-webkit-scrollbar {
+    display: none;
+}
+#db-llmstats .llm-tab {
+    padding: 7px 14px;
+    font-size: 14.4px;
+    font-weight: bold;
+    color: var(--llm-muted-text);
+    cursor: pointer;
+    border: 1px solid var(--llm-border);
+    border-bottom: none;
+    background: var(--llm-tab-surface);
+    user-select: none;
+    white-space: nowrap;
+    position: relative;
+    flex: 0 0 auto;
+}
+#db-llmstats .llm-tab + .llm-tab {
+    border-left: none;
+}
+#db-llmstats .llm-tab-label {
+    position: relative;
+    z-index: 2;
+}
+#db-llmstats .llm-tab-status-mark,
+#db-llmstats .llm-tab-selected-mark {
+    display: none;
+    position: absolute;
+    pointer-events: none;
+}
+#db-llmstats .llm-tab.is-online,
+#db-llmstats .llm-tab.is-offline {
+    padding-top: 8px;
+}
+#db-llmstats .llm-tab.is-online .llm-tab-status-mark,
+#db-llmstats .llm-tab.is-offline .llm-tab-status-mark {
+    display: block;
+    top: 0;
+    left: 14px;
+    right: 14px;
+    height: 1px;
+    z-index: 3;
+    -webkit-mask-image:
+        linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%),
+        linear-gradient(180deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+        linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%),
+        linear-gradient(180deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
+    mask-composite: intersect;
+}
+#db-llmstats .llm-tab.is-online .llm-tab-status-mark {
+    background: var(--llm-green);
+    box-shadow: 0 0 3px rgba(76, 175, 80, 0.18);
+    animation: llmstats-status-mark-pulse 2.4s ease-in-out infinite;
+}
+#db-llmstats .llm-tab.is-offline .llm-tab-status-mark {
+    background: var(--llm-red);
+    box-shadow: 0 0 4px rgba(217, 83, 79, 0.35);
+}
+#db-llmstats .llm-tab.is-selected {
+    background: var(--llm-panel-surface);
+    color: var(--llm-strong-text);
+}
+#db-llmstats .llm-tab.is-selected .llm-tab-selected-mark {
+    display: block;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    background: var(--llm-accent);
+    z-index: 1;
+}
+#db-llmstats .llm-panel {
+    display: none;
+    border: 1px solid var(--llm-border);
+    border-top: none;
+    background: var(--llm-panel-surface);
+    min-height: 220px;
+    overflow: hidden;
+}
+#db-llmstats .llm-panel.is-selected {
+    display: block;
+}
+#db-llmstats .llm-server-status {
+    display: grid;
+    grid-template-columns: minmax(160px, 1.4fr) repeat(4, minmax(90px, 1fr));
+    border-bottom: 1px solid var(--llm-border);
+    background: var(--llm-tab-surface);
+}
+#db-llmstats .llm-status-cell {
+    min-width: 0;
+    padding: 8px;
+    border-right: 1px solid var(--llm-border-soft);
+}
+#db-llmstats .llm-status-cell:last-child {
+    border-right: 0;
+}
+#db-llmstats .llm-status-name {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--llm-strong-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#db-llmstats .llm-status-url {
+    margin-top: 4px;
+    color: var(--llm-muted-text);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#db-llmstats .llm-label {
+    color: var(--llm-muted-text);
+    font-size: 10px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+#db-llmstats .llm-value {
+    color: var(--llm-text);
+    font-size: 12px;
+    font-weight: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#db-llmstats .llm-model-list {
+    display: grid;
+    gap: 6px;
+    padding: 8px;
+    max-height: 265px;
+    overflow: auto;
+}
+#db-llmstats .llm-model-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px;
+    align-items: stretch;
+    border: 1px solid var(--llm-border-soft);
+    background: var(--llm-row-surface);
+    color: var(--llm-text);
+    min-height: 48px;
+}
+#db-llmstats .llm-model-card.props-1 {
+    grid-template-columns: minmax(130px, 1.35fr) minmax(82px, 0.75fr) 96px;
+}
+#db-llmstats .llm-model-card.props-2 {
+    grid-template-columns: minmax(130px, 1.25fr) minmax(82px, 0.7fr) minmax(82px, 0.7fr) 96px;
+}
+#db-llmstats .llm-model-card.props-3 {
+    grid-template-columns: minmax(130px, 1.15fr) minmax(78px, 0.65fr) minmax(78px, 0.65fr) minmax(78px, 0.65fr) 96px;
+}
+#db-llmstats .llm-model-card.is-loaded {
+    border-color: var(--llm-loaded-border);
+    animation: llmstats-loaded-card-pulse 2.4s ease-in-out infinite;
+}
+#db-llmstats .llm-model-main,
+#db-llmstats .llm-model-prop,
+#db-llmstats .llm-model-actions {
+    min-width: 0;
+    padding: 7px 8px;
+    border-right: 1px solid var(--llm-border-soft);
+}
+#db-llmstats .llm-model-actions {
+    border-right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+#db-llmstats .llm-model-name {
+    margin: 0;
+    color: var(--llm-strong-text);
+    font-size: 12.5px;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#db-llmstats .llm-button {
+    min-height: 26px;
+    padding: 0 8px;
+    border: 1px solid var(--llm-border);
+    background: var(--llm-tab-surface);
+    color: var(--llm-text);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+}
+#db-llmstats .llm-model-action-button {
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    max-width: 82px;
+    min-height: 24px;
+    margin: 0;
+    padding: 0 6px;
+    font-size: 11px;
+    line-height: 22px;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+#db-llmstats .llm-button:hover:not(:disabled) {
+    color: var(--llm-accent);
+    border-color: var(--llm-accent);
+}
+#db-llmstats .llm-button.danger {
+    color: var(--llm-danger-text);
+    border-color: var(--llm-offline-border);
+}
+#db-llmstats .llm-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+#db-llmstats .llm-empty {
+    margin: 8px;
+    padding: 18px;
+    color: var(--llm-muted-text);
+    border: 1px dashed var(--llm-border);
+    background: var(--llm-tab-surface);
+    font-size: 12px;
+}
+#llmstats-footer {
+    margin-top: 5px;
+    font-size: 10px;
+    color: var(--llm-footer-text);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+@keyframes llmstats-status-mark-pulse {
+    0%,
+    100% {
+        opacity: 0.55;
+        box-shadow: 0 0 3px rgba(76, 175, 80, 0.18);
+    }
+    50% {
+        opacity: 1;
+        box-shadow: 0 0 9px rgba(76, 175, 80, 0.48);
+    }
+}
+@keyframes llmstats-status-pulse {
+    0%,
+    100% {
+        opacity: 0.55;
+        box-shadow: 0 0 3px rgba(76, 175, 80, 0.18);
+    }
+    50% {
+        opacity: 1;
+        box-shadow: 0 0 10px rgba(76, 175, 80, 0.52);
+    }
+}
+@keyframes llmstats-loaded-card-pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 0 rgba(76, 175, 80, 0);
+    }
+    50% {
+        box-shadow: 0 0 11px rgba(76, 175, 80, 0.34);
+    }
+}
+@container (max-width: 560px) {
+    #db-llmstats .llm-server-status {
+        grid-template-columns: 1fr 1fr;
+    }
+    #db-llmstats .llm-status-cell:first-child {
+        grid-column: 1 / -1;
+    }
+}
+@container (max-width: 500px) {
+    #db-llmstats .llm-model-card.props-3 {
+        grid-template-columns: minmax(0, 1fr) 96px;
+    }
+    #db-llmstats .llm-model-card.props-3 .llm-model-prop {
+        display: none;
+    }
+}
+@container (max-width: 420px) {
+    #db-llmstats .llm-model-card.props-2 {
+        grid-template-columns: minmax(0, 1fr) 96px;
+    }
+    #db-llmstats .llm-model-card.props-2 .llm-model-prop {
+        display: none;
+    }
+}
+@container (max-width: 340px) {
+    #db-llmstats .llm-model-card.props-1 {
+        grid-template-columns: minmax(0, 1fr) 96px;
+    }
+    #db-llmstats .llm-model-card.props-1 .llm-model-prop {
+        display: none;
+    }
+}
+</style>
+
+<script type="text/javascript">
+    (function($) {
+    var llmstatsText = <?=$llmstats_text_js?>;
+    var refreshEnabled = <?=json_encode($refresh_enabled)?>;
+    var refreshInterval = <?=json_encode($refresh_interval_ms)?>;
+    var llmstatsCsrf = <?=$llmstats_csrf?>;
+    var llmstatsRequest = null;
+    var llmstatsActionPending = false;
+    var llmstatsConfirmUnload = true;
+    var llmstatsServersById = {};
+    var llmstatsModelScrollByServer = {};
+    var llmstatsPanelCache = {};
+
+    var llmstatsPropOrder = [
+        { field: 'quant', prop: 'quant', label: 'Quant' },
+        { field: 'memory', prop: 'memory', label: 'Memory' },
+        { field: 'busy', prop: 'state', label: 'State' }
+    ];
+
+    function llmstats_text(key, fallback) {
+        return llmstatsText && llmstatsText[key] ? llmstatsText[key] : fallback;
+    }
+
+    function llmstats_format(template, values) {
+        var result = String(template || '');
+        (values || []).forEach(function(value, index) {
+            result = result.replace('%' + (index + 1), value);
+        });
+        return result;
+    }
+
+    function llmstats_get_csrf_token() {
+        if (typeof window.csrf_token === 'string' && window.csrf_token) {
+            return window.csrf_token;
+        }
+        if (typeof window.csrfToken === 'string' && window.csrfToken) {
+            return window.csrfToken;
+        }
+        var fieldToken = $('input[name="csrf_token"]').first().val();
+        return fieldToken ? String(fieldToken) : llmstatsCsrf;
+    }
+
+    function llmstats_tab_class(server) {
+        return server.status === 'online' ? 'is-online' : 'is-offline';
+    }
+
+    function llmstats_build_chips(servers) {
+        var chips = $('#llmstats-chips');
+        chips.empty();
+        (servers || []).forEach(function(server) {
+            var chip = $('<div>')
+                .addClass('llm-chip')
+                .addClass(server.status === 'online' ? 'is-online' : 'is-offline');
+            $('<span>').addClass('llm-dot').addClass(server.dot || 'offline').appendTo(chip);
+            $('<span>').addClass('llm-chip-name').text(server.name || '').appendTo(chip);
+            $('<span>').addClass('llm-chip-meta').text(server.chipMeta || '').appendTo(chip);
+            chips.append(chip);
+        });
+    }
+
+    function llmstats_update_tab_edge_fades() {
+        var tabShell = document.getElementById('llmstats-tab-shell');
+        var tabBar = document.getElementById('llmstats-tab-bar');
+        if (!tabShell || !tabBar) return;
+
+        var maxScroll = tabBar.scrollWidth - tabBar.clientWidth;
+        tabShell.classList.toggle('has-left-overflow', tabBar.scrollLeft > 1);
+        tabShell.classList.toggle('has-right-overflow', maxScroll - tabBar.scrollLeft > 1);
+    }
+
+    function llmstats_find_tab(tabBar, serverId) {
+        return tabBar.find('.llm-tab').filter(function() {
+            return $(this).data('server-id') === serverId;
+        }).first();
+    }
+
+    function llmstats_place_tab(tabBar, tab, index) {
+        var tabEl = tab[0];
+        var currentEl = tabBar.children('.llm-tab').get(index);
+        if (currentEl === tabEl) return;
+
+        if (currentEl) {
+            tab.insertBefore(currentEl);
+        } else if (tabEl.parentNode !== tabBar[0] || tabEl !== tabBar.children('.llm-tab').last()[0]) {
+            tabBar[0].appendChild(tabEl);
+        }
+    }
+
+    function llmstats_update_tabs(servers) {
+        var tabBar = $('#llmstats-tab-bar');
+        var seen = {};
+
+        (servers || []).forEach(function(server, index) {
+            var tab = llmstats_find_tab(tabBar, server.id);
+
+            if (tab.length === 0) {
+                tab = $('<div>')
+                    .addClass('llm-tab')
+                    .attr('role', 'tab')
+                    .attr('tabindex', '-1')
+                    .attr('aria-selected', 'false');
+
+                $('<span>').addClass('llm-tab-status-mark').appendTo(tab);
+                $('<span>').addClass('llm-tab-selected-mark').appendTo(tab);
+                $('<span>').addClass('llm-tab-label').appendTo(tab);
+            }
+
+            seen[server.id] = true;
+            tab.removeClass('is-online is-offline')
+                .addClass(llmstats_tab_class(server))
+                .data('server-id', server.id)
+                .attr('id', 'llmstats-tab-' + server.id)
+                .attr('aria-controls', 'llmstats-panel-' + server.id)
+                .attr('aria-label', server.name || '');
+
+            var label = tab.find('.llm-tab-label');
+            if (label.text() !== (server.name || '')) {
+                label.text(server.name || '');
+            }
+
+            llmstats_place_tab(tabBar, tab, index);
+        });
+
+        tabBar.find('.llm-tab').each(function() {
+            var tab = $(this);
+            if (!seen[tab.data('server-id')]) {
+                tab.remove();
+            }
+        });
+    }
+
+    function llmstats_build_status_card(server) {
+        var card = $('<div>').addClass('llm-server-status');
+
+        var nameCell = $('<div>').addClass('llm-status-cell');
+        var nameRow = $('<div>').addClass('llm-status-name');
+        $('<span>').addClass('llm-dot').addClass(server.dot || 'offline').appendTo(nameRow);
+        nameRow.append(document.createTextNode(server.name || ''));
+        nameCell.append(nameRow);
+        $('<div>').addClass('llm-status-url').text(server.url || '').appendTo(nameCell);
+        card.append(nameCell);
+
+        (server.summary || []).slice(0, 4).forEach(function(cell) {
+            var statusCell = $('<div>').addClass('llm-status-cell');
+            $('<div>').addClass('llm-label').text(cell.label || '').appendTo(statusCell);
+            $('<div>').addClass('llm-value').text(cell.value || '').appendTo(statusCell);
+            card.append(statusCell);
+        });
+
+        return card;
+    }
+
+    function llmstats_enabled_props(server) {
+        var fields = server.fields || [];
+        return llmstatsPropOrder.filter(function(entry) {
+            return fields.indexOf(entry.field) !== -1;
+        });
+    }
+
+    function llmstats_build_model_card(server, model, enabledProps) {
+        var card = $('<article>')
+            .addClass('llm-model-card')
+            .addClass('props-' + Math.min(enabledProps.length, 3));
+
+        if (model.loaded) {
+            card.addClass('is-loaded');
+        }
+        if (model.state === 'busy') {
+            card.addClass('is-busy');
+        }
+
+        var main = $('<div>').addClass('llm-model-main');
+        $('<h4>').addClass('llm-model-name').text(model.name || '').attr('title', model.name || '').appendTo(main);
+        card.append(main);
+
+        enabledProps.forEach(function(entry) {
+            var prop = $('<div>').addClass('llm-model-prop');
+            $('<div>').addClass('llm-label').text(entry.label).appendTo(prop);
+            $('<div>').addClass('llm-value').text((model.props || {})[entry.prop] || 'Unavailable').appendTo(prop);
+            card.append(prop);
+        });
+
+        var actions = $('<div>').addClass('llm-model-actions');
+        if (model.canUnload && model.loaded) {
+            $('<button>')
+                .addClass('llm-button danger llm-model-action-button llmstats-unload-model')
+                .attr('type', 'button')
+                .attr('data-server-id', server.id)
+                .attr('data-model', model.name || '')
+                .text(llmstats_text('unload', 'Unload'))
+                .appendTo(actions);
+        } else if (!model.loaded) {
+            var canLoad = !!model.canLoad;
+            var loadTitle = canLoad
+                ? ''
+                : (model.loadUnavailableReason || llmstats_text('loadUnavailable', 'Loading this model is not supported by this server mode.'));
+            $('<button>')
+                .addClass('llm-button llm-model-action-button')
+                .toggleClass('llmstats-load-model', canLoad)
+                .toggleClass('llmstats-load-disabled', !canLoad)
+                .attr('type', 'button')
+                .attr('data-server-id', server.id)
+                .attr('data-model', model.name || '')
+                .prop('disabled', !canLoad)
+                .attr('title', loadTitle)
+                .text(llmstats_text('load', 'Load'))
+                .appendTo(actions);
+        }
+        card.append(actions);
+
+        return card;
+    }
+
+    function llmstats_save_model_scrolls() {
+        $('#llmstats-panels').find('.llm-panel').each(function() {
+            var panel = $(this);
+            var list = panel.find('.llm-model-list');
+            var serverId = panel.data('server-id');
+            if (serverId && list.length > 0) {
+                llmstatsModelScrollByServer[serverId] = list.scrollTop();
+            }
+        });
+    }
+
+    function llmstats_update_panels(servers) {
+        var panels = $('#llmstats-panels');
+        var seen = {};
+        llmstats_save_model_scrolls();
+
+        (servers || []).forEach(function(server) {
+            seen[server.id] = true;
+            var panelId = 'llmstats-panel-' + server.id;
+            var panel = $('#' + panelId);
+
+            // Skip the rebuild (and the scroll churn it causes) when nothing changed.
+            var snapshot = JSON.stringify(server);
+            if (panel.length > 0 && llmstatsPanelCache[server.id] === snapshot) {
+                return;
+            }
+            llmstatsPanelCache[server.id] = snapshot;
+
+            if (panel.length === 0) {
+                panel = $('<section>')
+                    .addClass('llm-panel')
+                    .attr('id', panelId)
+                    .attr('role', 'tabpanel')
+                    .attr('aria-labelledby', 'llmstats-tab-' + server.id)
+                    .data('server-id', server.id);
+            }
+
+            panel.empty();
+            panel.append(llmstats_build_status_card(server));
+
+            if (server.status !== 'online') {
+                $('<div>').addClass('llm-empty').text(llmstats_text('offlineHint', 'This configured server is offline. Please check the settings or server for issues.')).appendTo(panel);
+            } else if (!server.models || server.models.length === 0) {
+                $('<div>').addClass('llm-empty').text(llmstats_text('noModels', 'No models found on this server.')).appendTo(panel);
+            } else {
+                var list = $('<div>').addClass('llm-model-list');
+                var enabledProps = llmstats_enabled_props(server);
+                server.models.forEach(function(model) {
+                    list.append(llmstats_build_model_card(server, model, enabledProps));
+                });
+                panel.append(list);
+                list.scrollTop(llmstatsModelScrollByServer[server.id] || 0);
+            }
+
+            panels.append(panel);
+        });
+
+        panels.find('.llm-panel').each(function() {
+            var panel = $(this);
+            var serverId = panel.data('server-id');
+            if (!seen[serverId]) {
+                panel.remove();
+                delete llmstatsPanelCache[serverId];
+                delete llmstatsModelScrollByServer[serverId];
+            }
+        });
+
+        window.setTimeout(function() {
+            panels.find('.llm-panel').each(function() {
+                var panel = $(this);
+                var list = panel.find('.llm-model-list');
+                var serverId = panel.data('server-id');
+                if (serverId && list.length > 0) {
+                    list.scrollTop(llmstatsModelScrollByServer[serverId] || 0);
+                }
+            });
+        }, 0);
+    }
+
+    function llmstats_update_unload_all_button() {
+        var button = $('#llmstats-unload-all');
+        var selectedId = $('#llmstats-tab-bar').find('.llm-tab.is-selected').data('server-id');
+        var server = selectedId ? llmstatsServersById[selectedId] : null;
+        var enabled = !!(server && server.status === 'online' && server.loadedCount > 0 && !llmstatsActionPending);
+
+        button.prop('disabled', !enabled);
+        button.data('server-id', server ? server.id : '');
+    }
+
+    function llmstats_select_tab(tab) {
+        var selectedTab = $(tab);
+        if (selectedTab.length === 0) return;
+
+        var tabBar = $('#llmstats-tab-bar');
+        var serverId = selectedTab.data('server-id');
+
+        tabBar.find('.llm-tab')
+            .removeClass('is-selected')
+            .attr('aria-selected', 'false')
+            .attr('tabindex', '-1');
+
+        selectedTab
+            .addClass('is-selected')
+            .attr('aria-selected', 'true')
+            .attr('tabindex', '0');
+
+        $('#llmstats-panels').find('.llm-panel').each(function() {
+            var panel = $(this);
+            panel.toggleClass('is-selected', panel.data('server-id') === serverId);
+        });
+
+        llmstats_update_unload_all_button();
+    }
+
+    function llmstats_render_empty_state(message) {
+        $('#llmstats-tab-bar').empty();
+        $('#llmstats-panels').empty().append($('<div>').addClass('llm-empty').text(message));
+        llmstats_build_chips([]);
+        llmstatsServersById = {};
+        llmstatsPanelCache = {};
+        llmstatsModelScrollByServer = {};
+        llmstats_update_unload_all_button();
+        $('#llmstats-timestamp').text(new Date().toLocaleTimeString());
+        llmstats_update_tab_edge_fades();
+    }
+
+    function llmstats_handle_tab_keydown(event) {
+        var tabBar = $('#llmstats-tab-bar');
+        var tabs = tabBar.find('.llm-tab');
+        var currentIndex = tabs.index(this);
+        var targetIndex = currentIndex;
+
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+            targetIndex = currentIndex + 1 >= tabs.length ? 0 : currentIndex + 1;
+        } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+            targetIndex = currentIndex - 1 < 0 ? tabs.length - 1 : currentIndex - 1;
+        } else if (event.key === 'Home') {
+            targetIndex = 0;
+        } else if (event.key === 'End') {
+            targetIndex = tabs.length - 1;
+        } else if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            llmstats_select_tab($(this));
+            return;
+        } else {
+            return;
+        }
+
+        event.preventDefault();
+        tabs.eq(targetIndex).focus();
+        llmstats_select_tab(tabs.eq(targetIndex));
+    }
+
+    function llmstats_status() {
+        if (llmstatsRequest) {
+            return llmstatsRequest;
+        }
+
+        llmstatsRequest = $.ajax({
+            url: '/plugins/llmstats/llmstats_api.php?action=get_server_states',
+            dataType: 'json',
+            timeout: Math.max(refreshInterval * 2, 15000)
+        }).done(function(data) {
+            var servers = (data && Array.isArray(data.servers)) ? data.servers : [];
+            llmstatsConfirmUnload = !data || data.confirmUnload !== false;
+
+            if (servers.length === 0) {
+                llmstats_render_empty_state(llmstats_text('noServers', 'No servers configured.'));
+                return;
+            }
+
+            var tabBar = $('#llmstats-tab-bar');
+            var previouslySelected = tabBar.find('.llm-tab.is-selected').data('server-id');
+
+            llmstatsServersById = {};
+            servers.forEach(function(server) {
+                llmstatsServersById[server.id] = server;
+            });
+
+            llmstats_update_tabs(servers);
+            llmstats_update_panels(servers);
+            llmstats_build_chips(servers);
+
+            var selectedTab = llmstats_find_tab(tabBar, previouslySelected);
+            if (selectedTab.length > 0) {
+                llmstats_select_tab(selectedTab);
+            } else {
+                llmstats_select_tab(tabBar.find('.llm-tab').first());
+            }
+
+            llmstats_update_tab_edge_fades();
+            $('#llmstats-timestamp').text(new Date().toLocaleTimeString());
+        }).fail(function(jqXHR, textStatus, errorThrown) {
+            console.error('LLMStats AJAX Error:', textStatus, errorThrown);
+            llmstatsPanelCache = {};
+            $('#llmstats-panels').empty().append(
+                $('<div>').addClass('llm-empty').text(llmstats_text('loadError', 'Error loading server states.'))
+            );
+        }).always(function() {
+            llmstatsRequest = null;
+        });
+
+        return llmstatsRequest;
+    }
+
+    function llmstats_poll() {
+        llmstats_status().always(function() {
+            if (refreshEnabled && refreshInterval > 0) {
+                setTimeout(llmstats_poll, refreshInterval);
+            }
+        });
+    }
+
+    function llmstats_run_action(data) {
+        if (llmstatsActionPending) return;
+
+        llmstatsActionPending = true;
+        llmstats_update_unload_all_button();
+        data.csrf_token = llmstats_get_csrf_token();
+
+        $.ajax({
+            url: '/plugins/llmstats/llmstats_api.php',
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: data,
+            dataType: 'json',
+            timeout: 65000
+        }).done(function(response) {
+            if (!response || response.ok !== true) {
+                window.alert((response && response.error) ? response.error : llmstats_text('actionFailed', 'Unload request failed.'));
+            }
+        }).fail(function(xhr) {
+            var message = llmstats_text('actionFailed', 'Unload request failed.');
+            if (xhr && xhr.responseJSON && xhr.responseJSON.error) {
+                message = xhr.responseJSON.error;
+            } else if (xhr && xhr.responseText) {
+                message = xhr.responseText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            } else if (xhr && xhr.status) {
+                message = 'Unload request failed. HTTP ' + xhr.status;
+            }
+            window.alert(message);
+        }).always(function() {
+            llmstatsActionPending = false;
+            window.setTimeout(llmstats_status, 1500);
+        });
+    }
+
+    function llmstats_sync_collapsed_row() {
+        var contentRow = document.getElementById('llmstats-content-row');
+        var collapsedRow = document.getElementById('llmstats-collapsed-row');
+        if (!contentRow || !collapsedRow) return;
+
+        var isCollapsed = contentRow.style.display === 'none' || contentRow.hidden;
+        collapsedRow.style.display = isCollapsed ? '' : 'none';
+    }
+
+    // Watch for Unraid's openClose toggling the content row, and swap in/out the chips row
+    function llmstats_watch_collapse() {
+        var contentRow = document.getElementById('llmstats-content-row');
+        var collapsedRow = document.getElementById('llmstats-collapsed-row');
+        if (!contentRow || !collapsedRow) return;
+
+        llmstats_sync_collapsed_row();
+
+        var observer = new MutationObserver(llmstats_sync_collapsed_row);
+
+        observer.observe(contentRow, { attributes: true, attributeFilter: ['style', 'hidden'] });
+    }
+
+    $(function() {
+        $('#llmstats-tab-bar')
+            .on('click', '.llm-tab', function() {
+                llmstats_select_tab($(this));
+            })
+            .on('keydown', '.llm-tab', llmstats_handle_tab_keydown)
+            .on('scroll', llmstats_update_tab_edge_fades);
+
+        $('#llmstats-panels').on('click', '.llmstats-unload-model', function() {
+            var button = $(this);
+            var serverId = button.attr('data-server-id');
+            var model = button.attr('data-model');
+            var server = llmstatsServersById[serverId];
+            if (!server || !model) return;
+
+            if (llmstatsConfirmUnload) {
+                var message = llmstats_format(llmstats_text('confirmUnload', 'Unload %1 from %2?'), [model, server.name]);
+                if (!window.confirm(message)) return;
+            }
+
+            llmstats_run_action({ action: 'unload_model', server: serverId, model: model });
+        });
+
+        $('#llmstats-panels').on('click', '.llmstats-load-model', function() {
+            var button = $(this);
+            var serverId = button.attr('data-server-id');
+            var model = button.attr('data-model');
+            var server = llmstatsServersById[serverId];
+            if (!server || !model || button.prop('disabled')) return;
+
+            llmstats_run_action({ action: 'load_model', server: serverId, model: model });
+        });
+
+        $('#llmstats-panels').on('scroll', '.llm-model-list', function() {
+            var panel = $(this).closest('.llm-panel');
+            var serverId = panel.data('server-id');
+            if (serverId) {
+                llmstatsModelScrollByServer[serverId] = $(this).scrollTop();
+            }
+        });
+
+        $('#llmstats-unload-all').on('click', function() {
+            var serverId = $(this).data('server-id');
+            var server = llmstatsServersById[serverId];
+            if (!server) return;
+
+            if (llmstatsConfirmUnload) {
+                var message = llmstats_format(llmstats_text('confirmUnloadAll', 'Unload all loaded models on %1?'), [server.name]);
+                if (!window.confirm(message)) return;
+            }
+
+            llmstats_run_action({ action: 'unload_all', server: serverId });
+        });
+
+        $('#llmstats-refresh').on('click', function() {
+            llmstats_status();
+        });
+
+        window.addEventListener('resize', llmstats_update_tab_edge_fades);
+
+        llmstats_watch_collapse();
+
+        if (refreshEnabled && refreshInterval > 0) {
+            llmstats_poll();
+        } else {
+            llmstats_status();
+        }
+    });
+    })(jQuery);
+</script>
