@@ -377,7 +377,7 @@ EOT;
 }
 #db-llmstats .llm-model-card {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 96px;
+    grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
     border: 1px solid var(--llm-border-soft);
     background: var(--llm-row-surface);
@@ -385,12 +385,24 @@ EOT;
     min-height: 48px;
 }
 #db-llmstats .llm-model-card.props-1 {
-    grid-template-columns: minmax(130px, 1.35fr) minmax(82px, 0.75fr) 96px;
+    grid-template-columns: minmax(130px, 1.35fr) minmax(82px, 0.75fr);
 }
 #db-llmstats .llm-model-card.props-2 {
-    grid-template-columns: minmax(130px, 1.25fr) minmax(82px, 0.7fr) minmax(82px, 0.7fr) 96px;
+    grid-template-columns: minmax(130px, 1.25fr) minmax(82px, 0.7fr) minmax(82px, 0.7fr);
 }
 #db-llmstats .llm-model-card.props-3 {
+    grid-template-columns: minmax(130px, 1.15fr) minmax(78px, 0.65fr) minmax(78px, 0.65fr) minmax(78px, 0.65fr);
+}
+#db-llmstats .llm-model-card.has-actions {
+    grid-template-columns: minmax(0, 1fr) 96px;
+}
+#db-llmstats .llm-model-card.props-1.has-actions {
+    grid-template-columns: minmax(130px, 1.35fr) minmax(82px, 0.75fr) 96px;
+}
+#db-llmstats .llm-model-card.props-2.has-actions {
+    grid-template-columns: minmax(130px, 1.25fr) minmax(82px, 0.7fr) minmax(82px, 0.7fr) 96px;
+}
+#db-llmstats .llm-model-card.props-3.has-actions {
     grid-template-columns: minmax(130px, 1.15fr) minmax(78px, 0.65fr) minmax(78px, 0.65fr) minmax(78px, 0.65fr) 96px;
 }
 #db-llmstats .llm-model-card.is-loaded {
@@ -410,6 +422,9 @@ EOT;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+}
+#db-llmstats .llm-model-card > :last-child {
+    border-right: 0;
 }
 #db-llmstats .llm-model-name {
     margin: 0;
@@ -514,6 +529,9 @@ EOT;
 }
 @container (max-width: 500px) {
     #db-llmstats .llm-model-card.props-3 {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    #db-llmstats .llm-model-card.props-3.has-actions {
         grid-template-columns: minmax(0, 1fr) 96px;
     }
     #db-llmstats .llm-model-card.props-3 .llm-model-prop {
@@ -522,6 +540,9 @@ EOT;
 }
 @container (max-width: 420px) {
     #db-llmstats .llm-model-card.props-2 {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    #db-llmstats .llm-model-card.props-2.has-actions {
         grid-template-columns: minmax(0, 1fr) 96px;
     }
     #db-llmstats .llm-model-card.props-2 .llm-model-prop {
@@ -530,6 +551,9 @@ EOT;
 }
 @container (max-width: 340px) {
     #db-llmstats .llm-model-card.props-1 {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    #db-llmstats .llm-model-card.props-1.has-actions {
         grid-template-columns: minmax(0, 1fr) 96px;
     }
     #db-llmstats .llm-model-card.props-1 .llm-model-prop {
@@ -697,10 +721,17 @@ EOT;
         });
     }
 
+    function llmstats_model_actions_enabled(server) {
+        var fields = server && server.fields ? server.fields : [];
+        return fields.indexOf('actions') !== -1 && !!(server && server.supportsModelActions);
+    }
+
     function llmstats_build_model_card(server, model, enabledProps) {
+        var actionsEnabled = llmstats_model_actions_enabled(server);
         var card = $('<article>')
             .addClass('llm-model-card')
-            .addClass('props-' + Math.min(enabledProps.length, 3));
+            .addClass('props-' + Math.min(enabledProps.length, 3))
+            .toggleClass('has-actions', actionsEnabled);
 
         if (model.loaded) {
             card.addClass('is-loaded');
@@ -720,33 +751,35 @@ EOT;
             card.append(prop);
         });
 
-        var actions = $('<div>').addClass('llm-model-actions');
-        if (model.canUnload && model.loaded) {
-            $('<button>')
-                .addClass('llm-button danger llm-model-action-button llmstats-unload-model')
-                .attr('type', 'button')
-                .attr('data-server-id', server.id)
-                .attr('data-model', model.name || '')
-                .text(llmstats_text('unload', 'Unload'))
-                .appendTo(actions);
-        } else if (!model.loaded) {
-            var canLoad = !!model.canLoad;
-            var loadTitle = canLoad
-                ? ''
-                : (model.loadUnavailableReason || llmstats_text('loadUnavailable', 'Loading this model is not supported by this server mode.'));
-            $('<button>')
-                .addClass('llm-button llm-model-action-button')
-                .toggleClass('llmstats-load-model', canLoad)
-                .toggleClass('llmstats-load-disabled', !canLoad)
-                .attr('type', 'button')
-                .attr('data-server-id', server.id)
-                .attr('data-model', model.name || '')
-                .prop('disabled', !canLoad)
-                .attr('title', loadTitle)
-                .text(llmstats_text('load', 'Load'))
-                .appendTo(actions);
+        if (actionsEnabled) {
+            var actions = $('<div>').addClass('llm-model-actions');
+            if (model.canUnload && model.loaded) {
+                $('<button>')
+                    .addClass('llm-button danger llm-model-action-button llmstats-unload-model')
+                    .attr('type', 'button')
+                    .attr('data-server-id', server.id)
+                    .attr('data-model', model.name || '')
+                    .text(llmstats_text('unload', 'Unload'))
+                    .appendTo(actions);
+            } else if (!model.loaded) {
+                var canLoad = !!model.canLoad;
+                var loadTitle = canLoad
+                    ? ''
+                    : (model.loadUnavailableReason || llmstats_text('loadUnavailable', 'Loading this model is not supported by this server mode.'));
+                $('<button>')
+                    .addClass('llm-button llm-model-action-button')
+                    .toggleClass('llmstats-load-model', canLoad)
+                    .toggleClass('llmstats-load-disabled', !canLoad)
+                    .attr('type', 'button')
+                    .attr('data-server-id', server.id)
+                    .attr('data-model', model.name || '')
+                    .prop('disabled', !canLoad)
+                    .attr('title', loadTitle)
+                    .text(llmstats_text('load', 'Load'))
+                    .appendTo(actions);
+            }
+            card.append(actions);
         }
-        card.append(actions);
 
         return card;
     }
@@ -834,9 +867,10 @@ EOT;
         var button = $('#llmstats-unload-all');
         var selectedId = $('#llmstats-tab-bar').find('.llm-tab.is-selected').data('server-id');
         var server = selectedId ? llmstatsServersById[selectedId] : null;
-        var enabled = !!(server && server.status === 'online' && server.loadedCount > 0 && !llmstatsActionPending);
+        var enabled = !!(server && server.status === 'online' && server.loadedCount > 0 && llmstats_model_actions_enabled(server) && !llmstatsActionPending);
 
         button.prop('disabled', !enabled);
+        button.toggle(!!(server && llmstats_model_actions_enabled(server)));
         button.data('server-id', server ? server.id : '');
     }
 

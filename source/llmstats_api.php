@@ -404,6 +404,11 @@ function llmstats_llama_entry_is_placeholder($entry, $id)
     return strtolower((string)$id) === 'default' && !llmstats_llama_entry_has_model_path($entry);
 }
 
+function llmstats_llama_entry_has_state($entry)
+{
+    return is_array($entry) && (isset($entry['status']) || isset($entry['state']));
+}
+
 function llmstats_llama_entry_list($json)
 {
     if (!is_array($json)) {
@@ -426,12 +431,10 @@ function llmstats_llama_is_router($json)
     }
 
     // Single-model builds may alias /models to the OpenAI-style /v1/models
-    // list; only router mode reports per-model load state.
-    if (is_array($json['models'] ?? null)) {
-        return true;
-    }
+    // list, including a top-level models array. Treat it as router mode only
+    // when the entries expose per-model load state.
     foreach (llmstats_llama_entry_list($json) as $entry) {
-        if (is_array($entry) && (isset($entry['status']) || isset($entry['state']))) {
+        if (llmstats_llama_entry_has_state($entry)) {
             return true;
         }
     }
@@ -569,6 +572,7 @@ function llmstats_assemble_server_state($server, $results, $retry_seconds)
         'models' => [],
         'modelCount' => 0,
         'loadedCount' => 0,
+        'supportsModelActions' => false,
         'chipMeta' => 'offline'
     ];
 
@@ -612,10 +616,12 @@ function llmstats_assemble_server_state($server, $results, $retry_seconds)
     $state['dot'] = 'online';
 
     if ($type === 'ollama') {
+        $state['supportsModelActions'] = true;
         $state['models'] = llmstats_build_ollama_models($results);
     } else {
         $slots = llmstats_parse_llama_slots($results);
         $is_router = llmstats_llama_is_router(llmstats_http_json($results['llama_models'] ?? null));
+        $state['supportsModelActions'] = $is_router;
         $state['models'] = llmstats_build_llama_models($results, $is_router, $slots['busy'], $slots['total']);
     }
     $state['models'] = llmstats_sort_models($state['models']);
@@ -946,7 +952,8 @@ if ($method === 'GET' && $action === 'test_server') {
         'typeSource' => $state['typeSource'],
         'error' => $state['error'],
         'modelCount' => $state['modelCount'],
-        'loadedCount' => $state['loadedCount']
+        'loadedCount' => $state['loadedCount'],
+        'supportsModelActions' => $state['supportsModelActions']
     ]);
 }
 

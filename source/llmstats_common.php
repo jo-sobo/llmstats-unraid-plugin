@@ -122,7 +122,8 @@ function llmstats_model_fields()
     return [
         'quant' => 'Quantization',
         'memory' => 'Memory',
-        'busy' => 'Busy/idle state'
+        'busy' => 'Busy/idle state',
+        'actions' => 'Load/unload'
     ];
 }
 

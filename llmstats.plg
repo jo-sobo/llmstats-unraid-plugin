@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
  <!ENTITY name "llmstats">
  <!ENTITY author "jo-sobo">
- <!ENTITY version "2026.06.12-dev">
+ <!ENTITY version "2026.06.13b-dev">
  <!ENTITY branch "dev">
  <!ENTITY gitURL "https://github.com/jo-sobo/llmstats-unraid-plugin">
  <!ENTITY supportURL "https://github.com/jo-sobo/llmstats-unraid-plugin/issues">
@@ -13,8 +13,14 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&selfURL;" min="6.9.0" support="&supportURL;">
 
 <CHANGES>
-### 2026.06.12-dev
+### 2026.06.13b-dev
 - Development build from the 'dev' branch. For testing purposes only.
+
+### Unreleased
+- Fixed llama-server single-model mode detection when `/models` returns a top-level model list without router state; fixed `-m` models now show as loaded/idle instead of offering a load action.
+- Clarified that llama-server single-model mode is supported for monitoring, while load/unload controls require router mode.
+- Added a default-off "Load/unload controls" model card field. Unsupported server modes grey it out, hide per-model action space, and hide the unload-all control.
+- Fixed the settings preview so it only renders fields that are both selected and supported.
 
 ### 2026.06.11
 - Initial LLMStats release.
@@ -31,7 +37,7 @@
 
 <FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz" Run="upgradepkg --install-new">
 <URL>&pluginURL;</URL>
-<MD5>ff00f95e7dd9ac56f1f18de1c12833e0</MD5>
+<MD5>636dd732ae96b5ad260f04bda98a65ed</MD5>
 </FILE>
 
 <FILE Run="/bin/bash">

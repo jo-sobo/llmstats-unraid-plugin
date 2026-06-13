@@ -586,8 +586,12 @@ if (!is_string($field_order_js)) {
   white-space: nowrap;
 }
 .llm-preview-prop.is-disabled .llm-preview-prop-label,
-.llm-preview-prop.is-disabled .llm-preview-prop-value {
+.llm-preview-prop.is-disabled .llm-preview-prop-value,
+.llm-preview-actions.is-disabled .llm-preview-unload {
   color: var(--llm-settings-disabled-text);
+}
+.llm-preview-actions.is-disabled .llm-preview-unload {
+  border-color: var(--llm-settings-border-soft);
 }
 .llm-preview-actions {
   border-right: 0;
@@ -800,6 +804,11 @@ if (!is_string($field_order_js)) {
                   <span>Busy/idle state</span>
                   <span class="llm-field-default" data-field-note="busy">default</span>
                 </label>
+                <label class="llm-field-row" data-field-row="actions">
+                  <input type="checkbox" class="llmstats-field-toggle" data-preview-field="actions">
+                  <span>Load/unload controls</span>
+                  <span class="llm-field-default" data-field-note="actions">optional</span>
+                </label>
               </div>
             </div>
 
@@ -822,7 +831,7 @@ if (!is_string($field_order_js)) {
                   <span class="llm-preview-prop-label">State</span>
                   <span class="llm-preview-prop-value" data-preview-item="busy">Idle</span>
                 </div>
-                <div class="llm-preview-actions"><span class="llm-preview-unload">Unload</span></div>
+                <div class="llm-preview-actions" data-preview-field-cell="actions"><span class="llm-preview-unload">Unload</span></div>
               </div>
             </div>
           </div>
@@ -912,6 +921,14 @@ if (!is_string($field_order_js)) {
       var type = llmstats_effective_type(server);
       if (field === 'quant' || field === 'memory') return type === 'ollama';
       if (field === 'busy') return type === 'ollama' || type === 'llama-server';
+      if (field === 'actions') {
+        if (type === 'ollama') return true;
+        if (type === 'llama-server') {
+          var status = server ? statusById[server.id] : null;
+          return !!(status && status.supportsModelActions);
+        }
+        return false;
+      }
       return true;
     }
 
@@ -1061,27 +1078,33 @@ if (!is_string($field_order_js)) {
         enabled[field] = true;
       });
 
-      var visibleCount = 0;
+      var visiblePropCount = 0;
+      var actionsVisible = false;
       $('#llmstats-preview-card [data-preview-field-cell]').each(function() {
         var cell = $(this);
         var field = cell.attr('data-preview-field-cell');
         var supported = selectedServer ? llmstats_field_supported(selectedServer, field) : false;
-        var visible = !!enabled[field] || !supported;
+        var visible = !!enabled[field] && supported;
         cell.css('display', visible ? '' : 'none');
         cell.toggleClass('is-disabled', !supported);
         cell.find('[data-preview-item="' + field + '"]').text(supported ? previewValues[field] : 'Not supported');
-        if (visible) visibleCount++;
+        if (field === 'actions') {
+          actionsVisible = visible;
+        } else if (visible) {
+          visiblePropCount++;
+        }
       });
 
-      var propColumns = visibleCount > 0
-        ? ' repeat(' + visibleCount + ', minmax(90px, 1fr)) '
+      var propColumns = visiblePropCount > 0
+        ? ' repeat(' + visiblePropCount + ', minmax(90px, 1fr))'
         : ' ';
+      var actionColumn = actionsVisible ? ' minmax(112px, 0.7fr)' : '';
       $('#llmstats-preview-card')
-        .css('grid-template-columns', 'minmax(160px, 1.45fr)' + propColumns + 'minmax(112px, 0.7fr)');
+        .css('grid-template-columns', 'minmax(160px, 1.45fr)' + propColumns + actionColumn);
 
       $('#llmstats-preview-help').text(
         llmstats_effective_type(selectedServer) === 'llama-server'
-          ? 'Unsupported fields will be greyed out for this server type.'
+          ? 'Preview for the selected fields supported by this server mode.'
           : 'Preview for the currently selected server and its supported fields.'
       );
     }
@@ -1117,7 +1140,11 @@ if (!is_string($field_order_js)) {
           .prop('disabled', !supported)
           .prop('checked', supported && (selectedServer.fields || []).indexOf(field) !== -1);
         row.toggleClass('is-disabled', !supported);
-        $('[data-field-note="' + field + '"]').text(!supported ? 'not supported' : (field === 'busy' ? 'default' : 'Ollama only'));
+        $('[data-field-note="' + field + '"]').text(
+          !supported
+            ? 'not supported'
+            : (field === 'busy' ? 'default' : (field === 'actions' ? 'optional' : 'Ollama only'))
+        );
       });
 
       llmstats_update_preview();
