@@ -2,20 +2,17 @@
 <!DOCTYPE PLUGIN [
  <!ENTITY name "llmstats">
  <!ENTITY author "jo-sobo">
- <!ENTITY version "2026.06.13b-dev">
- <!ENTITY branch "dev">
+ <!ENTITY version "2026.06.13">
+ <!ENTITY branch "main">
  <!ENTITY gitURL "https://github.com/jo-sobo/llmstats-unraid-plugin">
  <!ENTITY supportURL "https://github.com/jo-sobo/llmstats-unraid-plugin/issues">
- <!ENTITY pluginURL "&gitURL;/raw/&branch;/packages/&name;-&version;.txz">
+ <!ENTITY pluginURL "&gitURL;/releases/download/&version;/&name;-&version;.txz">
  <!ENTITY selfURL "&gitURL;/raw/&branch;/&name;.plg">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&selfURL;" min="6.9.0" support="&supportURL;">
 
 <CHANGES>
-### 2026.06.13b-dev
-- Development build from the 'dev' branch. For testing purposes only.
-
 ### Unreleased
 - Fixed llama-server single-model mode detection when `/models` returns a top-level model list without router state; fixed `-m` models now show as loaded/idle instead of offering a load action.
 - Clarified that llama-server single-model mode is supported for monitoring, while load/unload controls require router mode.
@@ -37,7 +34,7 @@
 
 <FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz" Run="upgradepkg --install-new">
 <URL>&pluginURL;</URL>
-<MD5>636dd732ae96b5ad260f04bda98a65ed</MD5>
+<MD5>14832f1910a09768d3c1b4201b6571e0</MD5>
 </FILE>
 
 <FILE Run="/bin/bash">
