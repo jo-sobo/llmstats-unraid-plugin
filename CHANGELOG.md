@@ -1,0 +1,17 @@
+### Unreleased
+- Fixed llama-server single-model mode detection when `/models` returns a top-level model list without router state; fixed `-m` models now show as loaded/idle instead of offering a load action.
+- Clarified that llama-server single-model mode is supported for monitoring, while load/unload controls require router mode.
+- Added a default-off "Load/unload controls" model card field. Unsupported server modes grey it out, hide per-model action space, and hide the unload-all control.
+- Fixed the settings preview so it only renders fields that are both selected and supported.
+
+### 2026.06.11
+- Initial LLMStats release.
+- Dashboard tile with one tab per configured server, online/offline status glow, and a server status card per tab.
+- Model cards with configurable fields: quantization, memory, and busy/idle state.
+- Ollama support: server status, available models, running models, metadata, memory usage, and model load/unload.
+- llama-server support: health, model listing, router mode model state, slot busy/idle activity, and router mode model load/unload.
+- Server type autodetection with manual fallback.
+- Load unloaded models where supported, unload single model, and unload all loaded models with optional confirmation.
+- Collapsed dashboard state with compact server status chips.
+- Settings page with server management (add, remove, reorder, test), per-server model display fields, and setup guidance for both server types.
+- Light and dark theme support.

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Container>
+    <Plugin>True</Plugin>
+    <PluginURL>https://raw.githubusercontent.com/jo-sobo/llmstats-unraid-plugin/main/llmstats.plg</PluginURL>
+    <PluginAuthor>jo-sobo</PluginAuthor>
+    <Beta>false</Beta>
+    <Category>Tools:Utilities</Category>
+    <Name>LLMStats</Name>
+    <Description>
+        A dashboard widget to monitor locally hosted LLM servers (Ollama and llama-server) directly on the Unraid dashboard. Shows available and loaded models with memory usage, quantization, auto-unload timing and busy/idle state, and provides model load/unload controls. llama-server router mode is supported for full model management.
+    </Description>
+    <Project>https://github.com/jo-sobo/llmstats-unraid-plugin</Project>
+    <Support>https://github.com/jo-sobo/llmstats-unraid-plugin/issues</Support>
+    <Icon>https://raw.githubusercontent.com/jo-sobo/llmstats-unraid-plugin/main/source/llmstats.png</Icon>
+    <License>GPL v3</License>
+</Container>
