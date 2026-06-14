@@ -3,7 +3,7 @@
   <Overview>A dashboard widget to monitor locally hosted LLM servers, including Ollama and llama-server, directly from the Unraid dashboard.</Overview>
   <PluginURL>https://raw.githubusercontent.com/jo-sobo/llmstats-unraid-plugin/main/llmstats.plg</PluginURL>
   <PluginAuthor>jo-sobo</PluginAuthor>
-  <Support>https://github.com/jo-sobo/llmstats-unraid-plugin/issues</Support>
+  <Support>https://forums.unraid.net/topic/199438-plugin-llmstats</Support>
   <Project>https://github.com/jo-sobo/llmstats-unraid-plugin</Project>
   <ReadMe>https://raw.githubusercontent.com/jo-sobo/llmstats-unraid-plugin/main/README.md</ReadMe>
   <Category>Tools:Utilities</Category>
