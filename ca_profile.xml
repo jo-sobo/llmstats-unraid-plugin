@@ -1,0 +1,12 @@
+<CommunityApplications>
+  <Profile>
+    LLMStats provides an Unraid dashboard plugin for monitoring local Ollama and llama-server endpoints, including server status, model state, slot activity, and optional model load/unload controls where supported.
+  </Profile>
+  <Icon>https://raw.githubusercontent.com/jo-sobo/llmstats-unraid-plugin/main/source/llmstats.png</Icon>
+  <WebPage>https://github.com/jo-sobo/llmstats-unraid-plugin</WebPage>
+  <DonateLink>https://coff.ee/magnum.308</DonateLink>
+  <DonateText>Support LLMStats</DonateText>
+  <Photo>https://raw.githubusercontent.com/jo-sobo/llmstats-unraid-plugin/main/llmstats_screenshot_ollama.png</Photo>
+  <Photo>https://raw.githubusercontent.com/jo-sobo/llmstats-unraid-plugin/main/llmstats_screenshot_llama-server.png</Photo>
+  <Photo>https://raw.githubusercontent.com/jo-sobo/llmstats-unraid-plugin/main/llmstats_screenshot_offline.png</Photo>
+</CommunityApplications>
