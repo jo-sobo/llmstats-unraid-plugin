@@ -1,4 +1,4 @@
-### Unreleased
+### 2026.06.16
 - Simplified config loading to rely on Unraid's `parse_plugin_cfg()`, which already overlays the user config onto `default.cfg`; `default.cfg` is now the single source of truth for defaults (no behavior change).
 
 ### 2026.06.13
