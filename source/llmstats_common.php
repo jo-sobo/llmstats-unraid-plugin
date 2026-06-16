@@ -2,8 +2,6 @@
 
 function llmstats_default_cfg()
 {
-    // default.cfg is the single source of truth for defaults. It ships in the
-    // plugin package and is what parse_plugin_cfg() overlays the user cfg onto.
     $defaults = @parse_ini_file('/usr/local/emhttp/plugins/llmstats/default.cfg');
 
     return is_array($defaults) ? $defaults : [];
@@ -11,8 +9,6 @@ function llmstats_default_cfg()
 
 function llmstats_read_cfg($plugin_name = 'llmstats')
 {
-    // parse_plugin_cfg() already overlays the user's .cfg onto default.cfg and
-    // backfills any missing keys, so no extra default merge is needed here.
     $cfg = parse_plugin_cfg($plugin_name);
 
     return is_array($cfg) ? $cfg : [];
