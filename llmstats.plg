@@ -5,7 +5,7 @@
  <!ENTITY version "2026.06.16">
  <!ENTITY branch "main">
  <!ENTITY gitURL "https://github.com/jo-sobo/llmstats-unraid-plugin">
- <!ENTITY supportURL "https://github.com/jo-sobo/llmstats-unraid-plugin/issues">
+ <!ENTITY supportURL "https://forums.unraid.net/topic/199438-plugin-llmstats">
  <!ENTITY pluginURL "&gitURL;/releases/download/&version;/&name;-&version;.txz">
  <!ENTITY selfURL "&gitURL;/raw/&branch;/&name;.plg">
 ]>

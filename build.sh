@@ -4,7 +4,7 @@ set -euo pipefail
 PLUGIN_NAME="llmstats"
 AUTHOR="jo-sobo"
 GIT_URL="https://github.com/${AUTHOR}/llmstats-unraid-plugin"
-SUPPORT_URL="https://github.com/${AUTHOR}/llmstats-unraid-plugin/issues"
+SUPPORT_URL="https://forums.unraid.net/topic/199438-plugin-llmstats"
 PACKAGE_DIR_FINAL="packages"
 PACKAGE_DIR_TEMP="package-temp"
 CHANGELOG_FILE="CHANGELOG.md"
