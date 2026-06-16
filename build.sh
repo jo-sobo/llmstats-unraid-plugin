@@ -61,7 +61,7 @@ fi
 echo "Starting build for version ${VERSION} on branch ${BRANCH}..."
 
 rm -rf "${PACKAGE_DIR_TEMP}"
-# Same-day dev builds are kept for the suffix scheme; older dev builds are pruned after packaging.
+# Dev builds accumulate across days; the suffix scheme keeps same-day builds distinct.
 mkdir -p "${PACKAGE_DIR_TEMP}"
 mkdir -p "${PACKAGE_DIR_FINAL}"
 
@@ -96,11 +96,6 @@ fi
 
 echo "Package created: $(du -h "${PACKAGE_PATH}" | cut -f1)"
 echo "Package MD5: ${PACKAGE_MD5}"
-
-if [[ "$STAGE_INPUT" == "dev" ]]; then
-    # Older-day dev builds are superseded; today's are kept so the suffix scheme stays stable.
-    find "${PACKAGE_DIR_FINAL}" -maxdepth 1 -type f -name "${PLUGIN_NAME}-*-dev.txz" ! -name "${PLUGIN_NAME}-${BASE_VERSION}*" -delete
-fi
 
 echo "Generating ${PLUGIN_NAME}.plg for '${BRANCH}' target..."
 
