@@ -1,4 +1,7 @@
-### Unreleased
+### 2026.06.16
+- Simplified config loading to rely on Unraid's `parse_plugin_cfg()`, which already overlays the user config onto `default.cfg`; `default.cfg` is now the single source of truth for defaults (no behavior change).
+
+### 2026.06.13
 - Fixed llama-server single-model mode detection when `/models` returns a top-level model list without router state; fixed `-m` models now show as loaded/idle instead of offering a load action.
 - Clarified that llama-server single-model mode is supported for monitoring, while load/unload controls require router mode.
 - Added a default-off "Load/unload controls" model card field. Unsupported server modes grey it out, hide per-model action space, and hide the unload-all control.
