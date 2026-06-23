@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
  <!ENTITY name "llmstats">
  <!ENTITY author "jo-sobo">
- <!ENTITY version "2026.06.16">
+ <!ENTITY version "2026.06.23">
  <!ENTITY branch "main">
  <!ENTITY gitURL "https://github.com/jo-sobo/llmstats-unraid-plugin">
  <!ENTITY supportURL "https://forums.unraid.net/topic/199438-plugin-llmstats">
@@ -13,6 +13,9 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&selfURL;" min="6.9.0" support="&supportURL;">
 
 <CHANGES>
+### 2026.06.23
+- Model card border is now yellow for loading models and light blue for sleeping models.
+
 ### 2026.06.16
 - Simplified config loading to rely on Unraid's `parse_plugin_cfg()`, which already overlays the user config onto `default.cfg`; `default.cfg` is now the single source of truth for defaults (no behavior change).
 
@@ -37,7 +40,7 @@
 
 <FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz" Run="upgradepkg --install-new">
 <URL>&pluginURL;</URL>
-<MD5>5da442f0a0c73054b3a6f57798e4e53d</MD5>
+<MD5>2fa8a08e3dd727086efc8ac3c126e2d3</MD5>
 </FILE>
 
 <FILE Run="/bin/bash">
