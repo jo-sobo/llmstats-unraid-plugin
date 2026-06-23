@@ -1,3 +1,6 @@
+### 2026.06.23
+- Model card border is now yellow for loading models and light blue for sleeping models.
+
 ### 2026.06.16
 - Simplified config loading to rely on Unraid's `parse_plugin_cfg()`, which already overlays the user config onto `default.cfg`; `default.cfg` is now the single source of truth for defaults (no behavior change).
 
