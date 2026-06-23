@@ -221,7 +221,7 @@ function llmstats_set_model_state(&$model, $state_key)
         'loaded' => ['state' => 'loaded', 'label' => 'Loaded', 'sub' => 'loaded'],
         'idle' => ['state' => 'loaded', 'label' => 'Idle', 'sub' => 'loaded · idle'],
         'busy' => ['state' => 'busy', 'label' => 'Busy', 'sub' => 'loaded · busy'],
-        'sleeping' => ['state' => 'loaded', 'label' => 'Sleeping', 'sub' => 'loaded'],
+        'sleeping' => ['state' => 'sleeping', 'label' => 'Sleeping', 'sub' => 'sleeping'],
         'loading' => ['state' => 'loading', 'label' => 'Loading', 'sub' => 'loading'],
         'failed' => ['state' => 'failed', 'label' => 'Failed', 'sub' => 'failed']
     ];

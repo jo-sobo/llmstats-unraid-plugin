@@ -112,6 +112,7 @@ EOT;
     --llm-dot-idle: <?= $llmstats_theme_light ? '#888' : '#555' ?>;
     --llm-loaded-border: <?= $llmstats_theme_light ? '#3f7f46' : '#3a6b3a' ?>;
     --llm-busy-border: <?= $llmstats_theme_light ? '#9a7b2d' : '#75602a' ?>;
+    --llm-sleeping-border: <?= $llmstats_theme_light ? '#2e6da4' : '#29527a' ?>;
     --llm-offline-border: <?= $llmstats_theme_light ? '#c94d48' : '#7a3b39' ?>;
     --llm-danger-text: <?= $llmstats_theme_light ? '#8a2723' : '#e8b0ad' ?>;
     --llm-edge-fade: <?= $llmstats_theme_light ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.88)' ?>;
@@ -409,6 +410,14 @@ EOT;
     border-color: var(--llm-loaded-border);
     animation: llmstats-loaded-card-pulse 2.4s ease-in-out infinite;
 }
+#db-llmstats .llm-model-card.is-loading {
+    border-color: var(--llm-busy-border);
+    animation: llmstats-loading-card-pulse 2.4s ease-in-out infinite;
+}
+#db-llmstats .llm-model-card.is-sleeping {
+    border-color: var(--llm-sleeping-border);
+    animation: llmstats-sleeping-card-pulse 2.4s ease-in-out infinite;
+}
 #db-llmstats .llm-model-main,
 #db-llmstats .llm-model-prop,
 #db-llmstats .llm-model-actions {
@@ -517,6 +526,24 @@ EOT;
     }
     50% {
         box-shadow: 0 0 11px rgba(76, 175, 80, 0.34);
+    }
+}
+@keyframes llmstats-loading-card-pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 0 rgba(215, 170, 69, 0);
+    }
+    50% {
+        box-shadow: 0 0 11px rgba(215, 170, 69, 0.34);
+    }
+}
+@keyframes llmstats-sleeping-card-pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 0 rgba(46, 109, 164, 0);
+    }
+    50% {
+        box-shadow: 0 0 11px rgba(46, 109, 164, 0.34);
     }
 }
 @container (max-width: 560px) {
@@ -738,6 +765,12 @@ EOT;
         }
         if (model.state === 'busy') {
             card.addClass('is-busy');
+        }
+        if (model.state === 'loading') {
+            card.addClass('is-loading');
+        }
+        if (model.state === 'sleeping') {
+            card.addClass('is-sleeping');
         }
 
         var main = $('<div>').addClass('llm-model-main');
